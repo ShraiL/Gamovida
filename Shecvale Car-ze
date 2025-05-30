@@ -1,0 +1,606 @@
+Form1.Designer.cs:
+namespace LashaMurgvaLominadzeShraieri.Quiz3
+{
+    partial class Form1
+    {
+        private System.ComponentModel.IContainer components = null;
+        private ListBox listBox;
+        private Button addBtn;
+        private Button editBtn;
+        private Button deleteBtn;
+
+        private void InitializeComponent()
+        {
+            listBox = new ListBox();
+            addBtn = new Button();
+            editBtn = new Button();
+            deleteBtn = new Button();
+            SuspendLayout();
+            // 
+            // listBox
+            // 
+            listBox.FormattingEnabled = true;
+            listBox.ItemHeight = 15;
+            listBox.Location = new Point(14, 308);
+            listBox.Name = "listBox";
+            listBox.Size = new Size(886, 259);
+            listBox.TabIndex = 3;
+            // 
+            // addBtn
+            // 
+            addBtn.Location = new Point(14, 168);
+            addBtn.Name = "addBtn";
+            addBtn.Size = new Size(86, 31);
+            addBtn.TabIndex = 2;
+            addBtn.Text = "Add";
+            addBtn.Click += addBtn_Click;
+            // 
+            // editBtn
+            // 
+            editBtn.Location = new Point(135, 168);
+            editBtn.Name = "editBtn";
+            editBtn.Size = new Size(86, 31);
+            editBtn.TabIndex = 1;
+            editBtn.Text = "Edit";
+            editBtn.Click += editBtn_Click;
+            // 
+            // deleteBtn
+            // 
+            deleteBtn.Location = new Point(245, 168);
+            deleteBtn.Name = "deleteBtn";
+            deleteBtn.Size = new Size(86, 31);
+            deleteBtn.TabIndex = 0;
+            deleteBtn.Text = "Delete";
+            deleteBtn.Click += deleteBtn_Click;
+            // 
+            // Form1
+            // 
+            ClientSize = new Size(914, 600);
+            Controls.Add(deleteBtn);
+            Controls.Add(editBtn);
+            Controls.Add(addBtn);
+            Controls.Add(listBox);
+            Name = "Form1";
+            Text = "User Management";
+            ResumeLayout(false);
+        }
+    }
+}
+
+Form1.cs:
+// LashaMurgvaLominadzeShraieri.Quiz3/Form1.cs
+using LashaMurgvaLominadzeShraieri.Quiz3.Models;
+using LashaMurgvaLominadzeShraieri.Quiz3.Services;
+using System.ComponentModel; // Make sure this is included
+
+namespace LashaMurgvaLominadzeShraieri.Quiz3
+{
+    public partial class Form1 : Form
+    {
+        // Change from PersonService to SqlPersonService
+        private readonly SqlPersonService _personService;
+        private readonly BindingList<Person> _bindingList;
+
+        public Form1()
+        {
+            InitializeComponent();
+            _personService = new SqlPersonService(); // Instantiate the new service
+            _bindingList = new BindingList<Person>();
+            listBox.DataSource = _bindingList;
+            listBox.DisplayMember = "ToString"; // Display the ToString() output in the ListBox
+
+            Sync(); // Load initial data from the database when the form loads
+        }
+
+        // Add Button Click Event
+        private void addBtn_Click(object sender, EventArgs e)
+        {
+            UserDialog dialog = new UserDialog();
+            if (dialog.ShowDialog() == DialogResult.OK)
+            {
+                var person = new Person(
+                    dialog.Name,
+                    dialog.Lastname,
+                    dialog.Email,
+                    dialog.Gender,
+                    dialog.Age
+                );
+
+                _personService.AddPerson(person);
+                Sync(); // Update the list
+            }
+        }
+
+        // Edit Button Click Event
+        private void editBtn_Click(object sender, EventArgs e)
+        {
+            // Get the selected Person object directly from the ListBox
+            if (listBox.SelectedItem is Person selectedPerson)
+            {
+                UserDialog dialog = new UserDialog(selectedPerson);
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    // Update the properties of the selectedPerson object
+                    selectedPerson.Name = dialog.Name;
+                    selectedPerson.Lastname = dialog.Lastname;
+                    selectedPerson.Email = dialog.Email;
+                    selectedPerson.Gender = dialog.Gender;
+                    selectedPerson.Age = dialog.Age;
+
+                    // Pass the updated Person object to the service
+                    _personService.UpdatePerson(selectedPerson);
+                    Sync(); // Update the list
+                }
+            }
+            else
+            {
+                MessageBox.Show("Please select a person to edit.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        // Delete Button Click Event
+        private void deleteBtn_Click(object sender, EventArgs e)
+        {
+            // Get the selected Person object directly from the ListBox
+            if (listBox.SelectedItem is Person selectedPerson)
+            {
+                // Pass the ID of the selected Person to the service for deletion
+                _personService.DeletePerson(selectedPerson.ID);
+                Sync(); // Update the list
+            }
+            else
+            {
+                MessageBox.Show("Please select a person to delete.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        // Sync the list with updated data
+        private void Sync()
+        {
+            _bindingList.Clear(); // Clear current list
+            var people = _personService.GetPeople().ToList(); // Get updated people from service
+            foreach (var person in people)
+            {
+                _bindingList.Add(person); // Add each person to the BindingList
+            }
+        }
+    }
+}
+
+Person.cs:
+// LashaMurgvaLominadzeShraieri.Quiz3.Models/Person.cs
+namespace LashaMurgvaLominadzeShraieri.Quiz3.Models
+{
+    public enum Gender
+    {
+        Male,
+        Female,
+        Other
+    }
+
+    public class Person
+    {
+        // Remove _nextId, as the database will handle ID generation
+        public int ID { get; set; } // Make ID settable
+        public string Name { get; set; }
+        public string Lastname { get; set; }
+        public string Email { get; set; }
+        public Gender Gender { get; set; }
+        public int Age { get; set; }
+
+        public Person(string name, string lastname, string email, Gender gender, int age)
+        {
+            // Do not set ID here; it will be assigned by the database on insert
+            Name = name;
+            Lastname = lastname;
+            Email = email;
+            Gender = gender;
+            Age = age;
+        }
+
+        // Add a default constructor for scenarios where you might instantiate
+        // a Person object and then set its properties individually (e.g., when reading from DB).
+        public Person() { }
+
+        // Basic email validation method (unchanged)
+        public bool IsEmailValid()
+        {
+            try
+            {
+                var mailAddress = new System.Net.Mail.MailAddress(Email);
+                return mailAddress.Address == Email;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public override string ToString()
+        {
+            return $"{ID} {Name} {Lastname}";
+        }
+    }
+}
+
+PersonService.cs:
+using LashaMurgvaLominadzeShraieri.Quiz3.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace LashaMurgvaLominadzeShraieri.Quiz3.Services
+{
+    public class PersonService
+    {
+        private readonly List<Person> _people;
+
+        public PersonService()
+        {
+            _people = new List<Person>();
+        }
+
+        public void AddPerson(Person person)
+        {
+            _people.Add(person);
+        }
+
+        public void DeletePerson(int index)
+        {
+            _people.RemoveAt(index);
+        }
+
+        public void UpdatePerson(int index, Person updatedPerson)
+        {
+            if (index >= 0 && index < _people.Count)
+            {
+                _people[index] = updatedPerson;
+            }
+        }
+
+        public IEnumerable<Person> GetPeople()
+        {
+            return _people;
+        }
+    }
+}
+
+Program.cs:
+namespace LashaMurgvaLominadzeShraieri.Quiz3
+{
+    internal static class Program
+    {
+        [STAThread]
+        static void Main()
+        {
+            ApplicationConfiguration.Initialize();
+            Application.Run(new Form1());
+        }
+    }
+}
+
+SQLPersonService.cs:
+// LashaMurgvaLominadzeShraieri.Quiz3.Services/SqlPersonService.cs
+using LashaMurgvaLominadzeShraieri.Quiz3.Models;
+using Microsoft.Data.SqlClient;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace LashaMurgvaLominadzeShraieri.Quiz3.Services
+{
+    public class SqlPersonService
+    {
+        private readonly string _connectionString;
+
+        public SqlPersonService()
+        {
+            // IMPORTANT: Replace "YourStrongPassword123!" with the actual password you used
+            // If you named your SQL Server container differently, adjust 'Server' accordingly.
+            _connectionString = "Server=localhost,1433;Database=UG;User Id=sa;Password=YourPassword123;TrustServerCertificate=True;";
+        }
+
+        public void AddPerson(Person person)
+        {
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                string sql = "INSERT INTO People (Firstname, Lastname, Email, Gender, Age) VALUES (@Firstname, @Lastname, @Email, @Gender, @Age)";
+                using (SqlCommand command = new SqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@Firstname", person.Name);
+                    command.Parameters.AddWithValue("@Lastname", person.Lastname);
+                    command.Parameters.AddWithValue("@Email", person.Email);
+                    command.Parameters.AddWithValue("@Gender", person.Gender.ToString()); // Store enum as string
+                    command.Parameters.AddWithValue("@Age", person.Age);
+                    command.ExecuteNonQuery(); // Execute the INSERT statement
+                }
+            }
+        }
+
+        public void DeletePerson(int id) // Changed from index to ID for database operations
+        {
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                string sql = "DELETE FROM People WHERE Id = @Id";
+                using (SqlCommand command = new SqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@Id", id);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void UpdatePerson(Person updatedPerson) // Takes Person object, not index
+        {
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                string sql = "UPDATE People SET Firstname = @Firstname, Lastname = @Lastname, Email = @Email, Gender = @Gender, Age = @Age WHERE Id = @Id";
+                using (SqlCommand command = new SqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@Firstname", updatedPerson.Name);
+                    command.Parameters.AddWithValue("@Lastname", updatedPerson.Lastname);
+                    command.Parameters.AddWithValue("@Email", updatedPerson.Email);
+                    command.Parameters.AddWithValue("@Gender", updatedPerson.Gender.ToString());
+                    command.Parameters.AddWithValue("@Age", updatedPerson.Age);
+                    command.Parameters.AddWithValue("@Id", updatedPerson.ID);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public IEnumerable<Person> GetPeople()
+        {
+            List<Person> people = new List<Person>();
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                string sql = "SELECT Id, Firstname, Lastname, Email, Gender, Age FROM People";
+                using (SqlCommand command = new SqlCommand(sql, connection))
+                {
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            // Convert gender string from DB back to Gender enum
+                            Gender gender;
+                            Enum.TryParse(reader["Gender"].ToString(), out gender);
+
+                            people.Add(new Person(
+                                name: reader["Firstname"].ToString(),
+                                lastname: reader["Lastname"].ToString(),
+                                email: reader["Email"].ToString(),
+                                gender: gender,
+                                age: (int)reader["Age"]
+                            )
+                            { ID = (int)reader["Id"] }); // Assign the ID from the database
+                        }
+                    }
+                }
+            }
+            return people;
+        }
+    }
+}
+
+
+UserDialog.Designer.cs:
+namespace LashaMurgvaLominadzeShraieri.Quiz3
+{
+    partial class UserDialog
+    {
+        private System.ComponentModel.IContainer components = null;
+        private TextBox NameTextBox;
+        private TextBox LastnameTextBox;
+        private TextBox EmailTextBox;
+        private ComboBox GenderComboBox;
+        private TextBox AgeTextBox;
+        private Button DoneButton;
+
+        private void InitializeComponent()
+        {
+            NameTextBox = new TextBox();
+            LastnameTextBox = new TextBox();
+            EmailTextBox = new TextBox();
+            GenderComboBox = new ComboBox();
+            AgeTextBox = new TextBox();
+            DoneButton = new Button();
+            fnamelbl = new Label();
+            lnamelbl = new Label();
+            emaillbl = new Label();
+            genderlbl = new Label();
+            agelbl = new Label();
+            SuspendLayout();
+            // 
+            // NameTextBox
+            // 
+            NameTextBox.Location = new Point(12, 30);
+            NameTextBox.Name = "NameTextBox";
+            NameTextBox.Size = new Size(200, 23);
+            NameTextBox.TabIndex = 0;
+            // 
+            // LastnameTextBox
+            // 
+            LastnameTextBox.Location = new Point(12, 70);
+            LastnameTextBox.Name = "LastnameTextBox";
+            LastnameTextBox.Size = new Size(200, 23);
+            LastnameTextBox.TabIndex = 1;
+            // 
+            // EmailTextBox
+            // 
+            EmailTextBox.Location = new Point(12, 110);
+            EmailTextBox.Name = "EmailTextBox";
+            EmailTextBox.Size = new Size(200, 23);
+            EmailTextBox.TabIndex = 2;
+            // 
+            // GenderComboBox
+            // 
+            GenderComboBox.Location = new Point(12, 150);
+            GenderComboBox.Name = "GenderComboBox";
+            GenderComboBox.Size = new Size(200, 23);
+            GenderComboBox.TabIndex = 3;
+            // 
+            // AgeTextBox
+            // 
+            AgeTextBox.Location = new Point(12, 190);
+            AgeTextBox.Name = "AgeTextBox";
+            AgeTextBox.Size = new Size(200, 23);
+            AgeTextBox.TabIndex = 4;
+            // 
+            // DoneButton
+            // 
+            DoneButton.Location = new Point(12, 230);
+            DoneButton.Name = "DoneButton";
+            DoneButton.Size = new Size(200, 30);
+            DoneButton.TabIndex = 5;
+            DoneButton.Text = "Done";
+            DoneButton.Click += DoneButton_Click;
+            // 
+            // fnamelbl
+            // 
+            fnamelbl.AutoSize = true;
+            fnamelbl.Location = new Point(12, 12);
+            fnamelbl.Name = "fnamelbl";
+            fnamelbl.Size = new Size(62, 15);
+            fnamelbl.TabIndex = 6;
+            fnamelbl.Text = "First name";
+            // 
+            // lnamelbl
+            // 
+            lnamelbl.AutoSize = true;
+            lnamelbl.Location = new Point(12, 56);
+            lnamelbl.Name = "lnamelbl";
+            lnamelbl.Size = new Size(61, 15);
+            lnamelbl.TabIndex = 7;
+            lnamelbl.Text = "Last name";
+            // 
+            // emaillbl
+            // 
+            emaillbl.AutoSize = true;
+            emaillbl.Location = new Point(12, 96);
+            emaillbl.Name = "emaillbl";
+            emaillbl.Size = new Size(36, 15);
+            emaillbl.TabIndex = 8;
+            emaillbl.Text = "Email";
+            // 
+            // genderlbl
+            // 
+            genderlbl.AutoSize = true;
+            genderlbl.Location = new Point(12, 132);
+            genderlbl.Name = "genderlbl";
+            genderlbl.Size = new Size(45, 15);
+            genderlbl.TabIndex = 9;
+            genderlbl.Text = "Gender";
+            // 
+            // agelbl
+            // 
+            agelbl.AutoSize = true;
+            agelbl.Location = new Point(12, 176);
+            agelbl.Name = "agelbl";
+            agelbl.Size = new Size(28, 15);
+            agelbl.TabIndex = 10;
+            agelbl.Text = "Age";
+            // 
+            // UserDialog
+            // 
+            ClientSize = new Size(230, 280);
+            Controls.Add(agelbl);
+            Controls.Add(genderlbl);
+            Controls.Add(emaillbl);
+            Controls.Add(lnamelbl);
+            Controls.Add(fnamelbl);
+            Controls.Add(NameTextBox);
+            Controls.Add(LastnameTextBox);
+            Controls.Add(EmailTextBox);
+            Controls.Add(GenderComboBox);
+            Controls.Add(AgeTextBox);
+            Controls.Add(DoneButton);
+            Name = "UserDialog";
+            Text = "User Dialog";
+            ResumeLayout(false);
+            PerformLayout();
+        }
+        private Label fnamelbl;
+        private Label lnamelbl;
+        private Label emaillbl;
+        private Label genderlbl;
+        private Label agelbl;
+    }
+}
+
+
+UserDialog.cs:
+using LashaMurgvaLominadzeShraieri.Quiz3.Models;
+using System;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace LashaMurgvaLominadzeShraieri.Quiz3
+{
+    public partial class UserDialog : Form
+    {
+        public string Name { get; private set; }
+        public string Lastname { get; private set; }
+        public string Email { get; private set; }
+        public Gender Gender { get; private set; }
+        public int Age { get; private set; }
+
+        public UserDialog()
+        {
+            InitializeComponent();
+
+            // Populate the GenderComboBox with Gender enum values
+            GenderComboBox.Items.AddRange(Enum.GetValues(typeof(Gender)).Cast<Gender>().Cast<object>().ToArray());
+        }
+
+        public UserDialog(Person person) : this()
+        {
+            NameTextBox.Text = person.Name;
+            LastnameTextBox.Text = person.Lastname;
+            EmailTextBox.Text = person.Email;
+            GenderComboBox.SelectedItem = person.Gender;  // Make sure this correctly sets the selected item
+            AgeTextBox.Text = person.Age.ToString();
+        }
+
+        private void DoneButton_Click(object sender, EventArgs e)
+        {
+            // Ensure the fields are populated correctly
+            Name = NameTextBox.Text;
+            Lastname = LastnameTextBox.Text;
+            Email = EmailTextBox.Text;
+
+            // Ensure the Gender ComboBox has a valid selected item
+            if (GenderComboBox.SelectedItem == null)
+            {
+                MessageBox.Show("Please select a gender.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            Gender = (Gender)GenderComboBox.SelectedItem;
+
+            // Validate the Age field
+            if (!int.TryParse(AgeTextBox.Text, out int age))
+            {
+                MessageBox.Show("Please enter a valid age.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            Age = age;
+
+            // Close the dialog after validation
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+    }
+}
+Task Instructions:
+
+• Create an application with a ListBox and three buttons: Add, Edit, and Delete. The application should allow users to add, edit, and delete cars. Each car should have the following data: ID, Model, Weight, Speed. The listbox should only display id and model
+
+Model. When using Add or Edit, a new dialog window should appear. In the case of Add. the dialog should have empty TextBox fields, while in the case of Edit, the selected car's data from the ListBox should populate the TextBoxes for editing. After completing actions in this dialog, there should be a "Done" button to save changes and close the dialog. The changes should be reflected in the ListBox. If displaying two separate dialog windows is challenging, you can include the fields in the same dialog, but this might result in fewer points.
+
+You can use internet resources
+
+
+
+ADjust to it this code:
+oh and instead of UG call the database CarDatabase and instead of LashaMurgvaLominadzeShraieri.Quiz3 use LashaMurgvaLominadzeShraieri.Final
